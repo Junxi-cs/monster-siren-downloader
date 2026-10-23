@@ -2,7 +2,7 @@
 // @name         塞壬唱片 音乐下载器
 // @name:en      Monster Siren Music Downloader
 // @namespace    https://github.com/Junxi-cs/monster-siren-downloader
-// @version      1.2.0
+// @version      1.3.0
 // @description  在塞壬唱片官网一键下载当前歌曲（原音质 MP3）。页面右侧出现悬浮「下载」按钮，点击即可保存到本地。
 // @description:en One-click download of the currently playing song on the Monster Siren (塞壬唱片) official site.
 // @author       Junxi-cs
@@ -75,15 +75,34 @@
     } catch (e) {}
   }
 
-  /* ---------- 2. 网络请求封装（优先 GM，绕过 CORS） ---------- */
-  function gm(method, url, responseType) {
+  /* ---------- 2. 网络请求层（GM 优先，自动降级原生 fetch） ---------- */
+  const hasGM = typeof GM_xmlhttpRequest === "function";
+
+  // 统一返回 { status, json(), blob(), text() }
+  function gmRequest(url, mode) {
     return new Promise(function (resolve, reject) {
       GM_xmlhttpRequest({
-        method: method,
+        method: "GET",
         url: url,
-        responseType: responseType || "json",
-        timeout: 60000,
-        onload: resolve,
+        responseType: mode === "blob" ? "blob" : mode === "text" ? "text" : "json",
+        timeout: 90000,
+        onload: function (r) {
+          resolve({
+            status: r.status,
+            raw: r.response,
+            json: function () {
+              const v = r.response;
+              return typeof v === "string" ? JSON.parse(v) : v;
+            },
+            blob: function () {
+              if (r.response instanceof Blob) return r.response;
+              return new Blob([r.response]);
+            },
+            text: function () {
+              return typeof r.response === "string" ? r.response : String(r.response);
+            },
+          });
+        },
         onerror: function () {
           reject(new Error("网络请求失败：" + url));
         },
@@ -94,16 +113,46 @@
     });
   }
 
+  async function fetchRequest(url, mode) {
+    const r = await fetch(url, { credentials: "include", mode: "cors" });
+    return {
+      status: r.status,
+      raw: r,
+      json: function () {
+        return r.json();
+      },
+      blob: function () {
+        return r.blob();
+      },
+      text: function () {
+        return r.text();
+      },
+    };
+  }
+
+  function request(url, mode) {
+    // GM_xmlhttpRequest 不受页面 CORS 限制；不可用时（如 Safari Userscripts）降级
+    if (hasGM) {
+      return gmRequest(url, mode).catch(function (err) {
+        // GM 层失败再尝试原生请求，避免单点失败
+        return fetchRequest(url, mode).catch(function () {
+          throw err;
+        });
+      });
+    }
+    return fetchRequest(url, mode);
+  }
+
   async function getJson(url) {
-    const r = await gm("GET", url, "json");
+    const r = await request(url, "json");
     if (r.status < 200 || r.status >= 300) throw new Error("接口返回 HTTP " + r.status);
-    return typeof r.response === "string" ? JSON.parse(r.response) : r.response;
+    return r.json();
   }
 
   async function getBlob(url) {
-    const r = await gm("GET", url, "blob");
+    const r = await request(url, "blob");
     if (r.status < 200 || r.status >= 300) throw new Error("音频返回 HTTP " + r.status);
-    return r.response;
+    return r.blob();
   }
 
   /* ---------- 3. 塞壬唱片 API ---------- */
@@ -203,6 +252,22 @@
     return base + "." + ext;
   }
 
+  // 兜底：直接用 <a href> 触发（浏览器原生下载，无 CORS 限制）
+  function directDownload(url, filename) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try {
+        a.remove();
+      } catch (e) {}
+    }, 30000);
+  }
+
   async function downloadCurrent() {
     const info = await resolveTrack();
     if (!info) {
@@ -224,25 +289,35 @@
     }
 
     const filename = safeName(info.name, extOf(info.url));
-    const blob = await getBlob(info.url);
-    const objUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objUrl;
-    a.download = filename;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () {
-      try {
-        URL.revokeObjectURL(objUrl);
-        a.remove();
-      } catch (e) {}
-    }, 60000);
 
-    return {
-      ok: true,
-      summary: "已开始下载：" + info.name + "（" + (blob.size / 1048576).toFixed(1) + " MB）",
-    };
+    // 优先走 Blob 下载，保证文件名可控
+    try {
+      const blob = await getBlob(info.url);
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () {
+        try {
+          URL.revokeObjectURL(objUrl);
+          a.remove();
+        } catch (e) {}
+      }, 60000);
+      return {
+        ok: true,
+        summary: "已开始下载：" + info.name + "（" + (blob.size / 1048576).toFixed(1) + " MB）",
+      };
+    } catch (e) {
+      // Blob 失败（多为 CDN 未开放 CORS）时退回浏览器原生下载
+      directDownload(info.url, filename);
+      return {
+        ok: true,
+        summary: "已触发浏览器原生下载：" + info.name + "（若未开始，请检查下载栏）",
+      };
+    }
   }
 
   /* ---------- 6. 悬浮按钮与提示 ---------- */
