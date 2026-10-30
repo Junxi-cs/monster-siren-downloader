@@ -1,10 +1,10 @@
 # 塞壬唱片 音乐下载器 · Monster Siren Music Downloader
 
-> 在[塞壬唱片官网](https://monster-siren.hypergryph.com/)一键下载当前歌曲原音质 MP3 的**用户脚本**。
+> 在[塞壬唱片官网](https://monster-siren.hypergryph.com/)一键下载当前歌曲原音质的**用户脚本**。
 > 一套代码，Chrome / Edge / Firefox / Safari 全平台可用。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](monster-siren-downloader.user.js)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](monster-siren-downloader.user.js)
 [![Userscript](https://img.shields.io/badge/userscript-Tampermonkey%20%7C%20Violentmonkey-orange.svg)](monster-siren-downloader.user.js)
 
 ---
@@ -15,7 +15,7 @@
 - **自动识别曲目**：三级识别策略 ——「正在播放的媒体元素」→「页面 URL 中的歌曲 ID」→「播放器标题匹配」。
 - **绕过跨域限制**：使用 `GM_xmlhttpRequest` 请求音频，即使 CDN 未开放 CORS 也能正常下载。
 - **原音质下载**：直接读取官方接口返回的 `sourceUrl`，不经过二次转码。
-- **文件名规范化**：自动清理 Windows / macOS 非法字符，命名为「歌曲名.mp3」。
+- **文件名规范化**：自动清理 Windows / macOS 非法字符，命名为「歌曲名.扩展名」（扩展名跟随官方音频格式）。
 - **轻量无依赖**：单文件脚本，无后端、无数据库、无追踪。
 
 ## 📦 安装

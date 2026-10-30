@@ -3,7 +3,7 @@
 // @name:en      Monster Siren Music Downloader
 // @namespace    https://github.com/Junxi-cs/monster-siren-downloader
 // @version      1.3.0
-// @description  在塞壬唱片官网一键下载当前歌曲（原音质 MP3）。页面右侧出现悬浮「下载」按钮，点击即可保存到本地。
+// @description  在塞壬唱片官网一键下载当前歌曲（原音质）。页面右侧出现悬浮「下载」按钮，点击即可保存到本地。
 // @description:en One-click download of the currently playing song on the Monster Siren (塞壬唱片) official site.
 // @author       Junxi-cs
 // @match        https://monster-siren.hypergryph.com/*
